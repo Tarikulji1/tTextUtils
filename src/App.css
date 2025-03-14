@@ -64,3 +64,48 @@ body, html {
 .navbar-dark {
   background-color: #343a40;
 }
+
+.btn-star {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  padding: 0 0.3rem;
+  transition: transform 0.2s;
+}
+
+.btn-star:hover {
+  transform: scale(1.2);
+}
+
+.rating-stars {
+  display: inline-flex;
+  gap: 0.5rem;
+}
+
+.animate__animated {
+  animation-duration: 0.5s;
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.animate__fadeIn {
+  animation-name: fadeIn;
+}
+
+.feedback-content {
+  line-height: 1.6;
+  position: relative;
+  padding-left: 1.5rem;
+}
+
+.feedback-content::before {
+  content: "“";
+  position: absolute;
+  left: 0;
+  top: -0.5rem;
+  font-size: 3rem;
+  color: #dee2e6;
+}
