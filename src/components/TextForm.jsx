@@ -1,124 +1,271 @@
-import React, { useEffect } from "react";
-import { useState } from "react";
+import React, { useState, useEffect, useCallback } from "react";
+import { 
+  FiCopy, 
+  FiCheckCircle, 
+  FiTrash2,
+  FiSave,
+  FiType,
+  FiArrowUp,
+  FiArrowDown,
+  FiFileText,
+  FiFile,
+  FiClock
+} from "react-icons/fi";
+import { saveAs } from "file-saver";
+import { Document, Packer, Paragraph, TextRun } from "docx";
 
+function TextForm({ heading }) {
+  const [text, setText] = useState('');
+  const [previewText, setPreviewText] = useState('');
+  const [isCopied, setIsCopied] = useState(false);
+  const [processing, setProcessing] = useState(false);
+  const [textStats, setTextStats] = useState({
+    words: 0,
+    characters: 0,
+    paragraphs: 0,
+    sentences: 0,
+    readingTime: 0
+  });
 
-function TextForm(props) {
-    const [text, setText] = useState('');
-    const [previewText, setPreviewText] = useState('');
-    const [isCopied, setIsCopied] = useState(false);
-
-    // Load saved text from localStorage when component mounts
-    useEffect(() => {
-      const savedText = localStorage.getItem('textInput');
-      if (savedText) {
-        setText(savedText);
-        setPreviewText(savedText); // Load saved preview text as well
-      }
-    }, []);
-
-    // Save text to localStorage whenever its changes
-    useEffect(() => {
-      localStorage.setItem('textInput', text);
-    }, [text]);
+  // Text analysis calculations
+  const analyzeText = useCallback((content) => {
+    const words = content.trim().split(/\s+/).filter(Boolean).length;
+    const characters = content.length;
+    const paragraphs = content.split(/\n\s*\n/).filter(p => p.trim()).length;
+    const sentences = content.split(/[.!?]+/).filter(s => s.trim()).length;
+    const readingTime = (words / 200).toFixed(1); // 200 wpm average
     
-    const handleUpChange = (event) => {
-        setText(event.target.value);
-        setPreviewText(event.target.value); // Update preview live as you type
-    };
+    return { words, characters, paragraphs, sentences, readingTime };
+  }, []);
 
-    const handleUpClick = () => {
-        setPreviewText(text.toUpperCase());
-    };
+  // Load/save text from localStorage
+  useEffect(() => {
+    const savedText = localStorage.getItem('textInput');
+    if (savedText) {
+      setText(savedText);
+      setPreviewText(savedText);
+      setTextStats(analyzeText(savedText));
+    }
+  }, [analyzeText]);
 
-    const handleLowClick = () => {
-        setPreviewText(text.toLowerCase());
-    };
+  useEffect(() => {
+    localStorage.setItem('textInput', text);
+    setTextStats(analyzeText(text));
+  }, [text, analyzeText]);
 
-    const handleSentenceCase = () => {
-      const sentenceCaseText = text.toLocaleLowerCase().replace(/(^\s*\w|[.!?]\s*\w)/g, c => c.toUpperCase());
-        setPreviewText(sentenceCaseText);
-    };
-    const handleTitleCase = () => {
-      const titleCaseText = text
-      .toLowerCase()
-      .split(' ')
-      .map(word => word.charAt(0).toUpperCase() + word.slice(1))
-      .join(' ');
-      setPreviewText(titleCaseText);
-    };
+  const handleTextChange = (e) => {
+    const newText = e.target.value;
+    setText(newText);
+    setPreviewText(newText);
+  };
 
-    const handleClear = () => {
-        setText('');
-        setPreviewText('');
-    };
+  // Text transformation handlers
+  const transformText = (transformFn) => {
+    setProcessing(true);
+    try {
+      const transformed = transformFn(text);
+      setPreviewText(transformed);
+    } catch (error) {
+      alert("Error processing text: " + error.message);
+    }
+    setProcessing(false);
+  };
 
-    const wordCount = text.trim().split(/\s+/).filter(Boolean).length;
+  const transformations = {
+    uppercase: () => text.toUpperCase(),
+    lowercase: () => text.toLowerCase(),
+    sentenceCase: () => text.toLowerCase().replace(/(^\s*\w|[.!?]\s*\w)/g, c => c.toUpperCase()),
+    titleCase: () => text.toLowerCase().split(' ').map(w => w[0].toUpperCase() + w.slice(1)).join(' '),
+    inverseCase: () => text.split('').map(c => c === c.toLowerCase() ? c.toUpperCase() : c.toLowerCase()).join('')
+  };
 
-    const handleSaveAsTxt = () => {
-      const blob = new Blob([previewText], { type: 'text/plain' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'text.txt';
-      link.click();
-    };
+  // File export handlers
+  const exportFile = (content, type, extension) => {
+    const blob = new Blob([content], { type });
+    saveAs(blob, `textutils-${Date.now()}.${extension}`);
+  };
 
-    const handleSaveAsWord = () => {
-      const header = `<html xmlns:o="urn:schemas-microsoft-com:office:office" ` + 
-                    `xmlns:w="urn:schemas-microsoft-com:office:word" ` + 
-                    `xmlns="http://www.w3.org/TR/REC-html40">` + 
-                    `<head><meta charset="utf-8"></head><body>`;
-      const footer = `</body></html>`;
-      const sourceHTML = header + previewText + footer;
-      const blob = new Blob(['\ufeff', sourceHTML], { type: 'application/msword' });
-      const url = URL.createObjectURL(blob);
-      const link = document.createElement('a');
-      link.href = url;
-      link.download = 'document.doc';
-      link.click();
-    };
+  const handleExport = async (format) => {
+    if (!previewText.trim()) return alert("No content to export!");
+  
+    switch(format) {
+      case 'txt':
+        exportFile(previewText, 'text/plain', 'txt');
+        break;
+      case 'docx':
+        const doc = new Document({
+          sections: [{
+            properties: {},
+            children: [
+              new Paragraph({
+                children: [
+                  new TextRun({
+                    text: previewText,
+                    font: "Arial",
+                    size: 24,
+                  }),
+                ],
+              }),
+            ],
+          }]
+        });
+  
+        Packer.toBlob(doc).then((blob) => {
+          saveAs(blob, `textutils-${Date.now()}.docx`);
+        });
+        break;
+      default:
+        break;
+    }
+  };
 
-    const handleCopyToClipboard = () => {
-      navigator.clipboard.writeText(previewText).then(() => {
-        setIsCopied(true);
-        setTimeout(() => setIsCopied(false), 2000);
-      }).catch(err => {
-        console.error('Could not copy text: ', err);
-      });
-    };
-    
+  const handleCopy = async () => {
+    try {
+      await navigator.clipboard.writeText(previewText);
+      setIsCopied(true);
+      setTimeout(() => setIsCopied(false), 2000);
+    } catch (err) {
+      alert("Failed to copy text!");
+    }
+  };
+
+  const handleClear = () => {
+    if (window.confirm("Are you sure you want to clear all text?")) {
+      setText('');
+      setPreviewText('');
+    }
+  };
+
   return (
-    <>
-    <div className="container my-3">
-      <h1>{props.heading}</h1>
-      <div className="mb-3">
-        <textarea className="form-control" id="myBox" value={text} onChange={handleUpChange} rows="15" placeholder="Start typing, or copy and paste your document here..."></textarea>
+    <div className="container-lg my-4">
+      <div className="card shadow-lg">
+        <div className="card-header bg-primary text-white">
+          <h2 className="mb-0">{heading}</h2>
+        </div>
+
+        <div className="card-body">
+          {/* Text Input Section */}
+          <div className="mb-4">
+            <label htmlFor="textInput" className="form-label fw-bold">
+              Enter your text below
+            </label>
+            <textarea
+              id="textInput"
+              className="form-control border-primary"
+              value={text}
+              onChange={handleTextChange}
+              rows="8"
+              placeholder="Start typing or paste your content here..."
+              style={{ resize: 'vertical' }}
+            />
+          </div>
+
+          {/* Quick Stats */}
+          <div className="row g-3 mb-4">
+            <div className="col-md-3">
+              <div className="card h-100 border-primary">
+                <div className="card-body">
+                  <FiFileText className="mb-2" size="1.5em" />
+                  <h5>{textStats.words} words</h5>
+                  <small className="text-muted">Word Count</small>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="card h-100 border-primary">
+                <div className="card-body">
+                  <FiType className="mb-2" size="1.5em" />
+                  <h5>{textStats.characters} chars</h5>
+                  <small className="text-muted">Character Count</small>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="card h-100 border-primary">
+                <div className="card-body">
+                  <FiClock className="mb-2" size="1.5em" />
+                  <h5>{textStats.readingTime} min</h5>
+                  <small className="text-muted">Reading Time</small>
+                </div>
+              </div>
+            </div>
+            <div className="col-md-3">
+              <div className="card h-100 border-primary">
+                <div className="card-body">
+                  <FiFile className="mb-2" size="1.5em" />
+                  <h5>{textStats.paragraphs}</h5>
+                  <small className="text-muted">Paragraphs</small>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          {/* Transformation Buttons */}
+          <div className="mb-4">
+            <h5 className="mb-3">Text Transformations</h5>
+            <div className="d-flex flex-wrap gap-2">
+              {Object.entries(transformations).map(([key, transform]) => (
+                <button
+                  key={key}
+                  className="btn btn-outline-primary d-flex align-items-center gap-2"
+                  onClick={() => transformText(transform)}
+                  disabled={!text.trim() || processing}
+                >
+                  <FiType />
+                  {key.charAt(0).toUpperCase() + key.slice(1)}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          {/* Export Controls */}
+          <div className="mb-4">
+            <h5 className="mb-3">Export Options</h5>
+            <div className="d-flex flex-wrap gap-2">
+              <button 
+                className="btn btn-success d-flex align-items-center gap-2"
+                onClick={() => handleExport('txt')}
+                disabled={!previewText.trim()}
+              >
+                <FiSave /> TXT
+              </button>
+              <button 
+                className="btn btn-success d-flex align-items-center gap-2"
+                onClick={() => handleExport('docx')}
+                disabled={!previewText.trim()}
+              >
+                <FiSave /> DOCX
+              </button>
+              <button
+                className="btn btn-danger d-flex align-items-center gap-2"
+                onClick={handleClear}
+                disabled={!text.trim()}
+              >
+                <FiTrash2 /> Clear All
+              </button>
+              <button
+                className={`btn ${isCopied ? 'btn-success' : 'btn-warning'} d-flex align-items-center gap-2`}
+                onClick={handleCopy}
+                disabled={!previewText.trim()}
+              >
+                {isCopied ? <FiCheckCircle /> : <FiCopy />}
+                {isCopied ? 'Copied!' : 'Copy'}
+              </button>
+            </div>
+          </div>
+
+          {/* Preview Section */}
+          <div className="mb-4">
+            <h5 className="mb-3">Preview</h5>
+            <div className="card border-primary">
+              <div className="card-body preview-content">
+                {previewText || <span className="text-muted">Your transformed text will appear here...</span>}
+              </div>
+            </div>
+          </div>
+        </div>
       </div>
-      <div className="d-flex justify-content-between my-3">
-      <span><h5>{wordCount} words, {text.length} characters</h5></span>
-      <div>
-      <button className="btn btn-success mx-2" onClick={handleSaveAsTxt}>Save as .txt</button>
-      <button className="btn btn-success mx-2" onClick={handleSaveAsWord}>Save as Word</button>
-      </div>
-      <span><h5>{(0.08 * wordCount).toFixed(2)} Minutes read</h5></span>
-      </div>
-      <button className="btn btn-primary mx-2" onClick={handleUpClick}>UpperCase</button>
-      <button className="btn btn-primary mx-2" onClick={handleLowClick}>LowerCase</button>
-      <button className="btn btn-dark mx-2" onClick={handleSentenceCase}>SentenceCase</button>
-      <button className="btn btn-light mx-2" onClick={handleTitleCase}>TitleCase</button>
     </div>
-    <div className="container my-3">
-      <button className="btn btn-danger mx-2" onClick={handleClear}>Clear</button>
-      <button style={{ backgroundColor: 'orange', color: 'white' }} className="btn mx-2" onClick={handleCopyToClipboard}> {isCopied ? 'Copied' : 'Copy'} <svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" className="feather feather-copy" style={{ marginLeft: '5px' }}> <rect x="9" y="9" width="13" height="13" rx="2" ry="2"></rect> <path d="M5 15H4a2 2 0 0 1-2-2V4a2 2 0 0 1 2-2h9a2 2 0 0 1 2 2v1"></path> </svg> </button>
-    </div>
-    <div className="container my-3">
-      <h2>Your Text summary</h2>
-      <h3>Preview Text</h3>
-      <div className="preview-box" style={{ border: '1px solid grey', padding: '10px', color: 'black', marginTop: '10px', backgroundColor: '#fff' }}>
-      <p>{previewText}</p>
-      </div>
-    </div>
-    </>
   );
 }
 

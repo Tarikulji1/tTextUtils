@@ -129,3 +129,28 @@ body, html {
 .navbar-toggler:not(.collapsed) {
   transform: rotate(90deg);
 }
+
+.preview-content {
+  min-height: 150px;
+  max-height: 400px;
+  overflow-y: auto;
+  white-space: pre-wrap;
+  line-height: 1.6;
+}
+
+.preview-content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.preview-content::-webkit-scrollbar-track {
+  background: #f1f1f1;
+}
+
+.preview-content::-webkit-scrollbar-thumb {
+  background: #888;
+  border-radius: 4px;
+}
+
+.preview-content::-webkit-scrollbar-thumb:hover {
+  background: #555;
+}
