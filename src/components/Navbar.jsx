@@ -32,6 +32,11 @@ function Navbar(props) {
                 {props.aboutText}
               </Link>
             </li>
+            <li className="nav-item">
+              <Link className="nav-link" to="/feedback">
+                Feedback
+              </Link>
+            </li>
           </ul>
           <form className="d-flex" role="search">
             <input
