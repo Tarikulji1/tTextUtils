@@ -109,3 +109,23 @@ body, html {
   font-size: 3rem;
   color: #dee2e6;
 }
+
+.navbar {
+  transition: background-color 0.3s ease;
+}
+
+.dropdown-menu {
+  transition: opacity 0.2s ease, transform 0.2s ease;
+}
+
+.navbar-toggler {
+  transition: transform 0.3s ease;
+}
+
+.navbar-toggler.collapsed {
+  transform: rotate(0deg);
+}
+
+.navbar-toggler:not(.collapsed) {
+  transform: rotate(90deg);
+}
